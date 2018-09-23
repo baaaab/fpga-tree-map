@@ -1,0 +1,8 @@
+*.o
+*.d
+unusual_object_detector
+*.gch
+mrpParser
+mrpParser.exe
+*.o
+*.d
