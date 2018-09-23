@@ -8,8 +8,13 @@
 #include <algorithm>
 
 #include "windirstat/CRect.h"
+#include "windirstat/CTreeMap.h"
+#include "CFpgaItem.h"
 
 CSdlDisplay::CSdlDisplay() :
+		_screen(NULL),
+		_treeMap(NULL),
+		_rootItem(NULL),
 		_windowWidth(900),
 		_windowHeight(900)
 {
@@ -42,33 +47,6 @@ uint32_t CSdlDisplay::getWidth() const
 uint32_t CSdlDisplay::getHeight() const
 {
 	return _windowHeight;
-}
-
-void CSdlDisplay::swapBuffers()
-{
-	while (SDL_PollEvent(&_event))
-	{
-		switch (_event.type)
-		{
-		case SDL_MOUSEMOTION:
-			//printf("Mouse moved by %d,%d to (%d,%d)\n", _event.motion.xrel, _event.motion.yrel,	_event.motion.x, _event.motion.y);
-			break;
-		case SDL_MOUSEBUTTONDOWN:
-			printf("Mouse button %d pressed at (%d,%d)\n", _event.button.button, _event.button.x, _event.button.y);
-			break;
-		case SDL_QUIT:
-			exit(0);
-		}
-	}
-
-	SDL_Flip(_screen);
-
-	SDL_FillRect(_screen, NULL, 0);
-}
-
-uint32_t* CSdlDisplay::getScreen() const
-{
-	return static_cast<uint32_t*>(_screen->pixels);
 }
 
 void CSdlDisplay::setPixel(int x, int y, uint32_t pixel)
@@ -178,6 +156,109 @@ void CSdlDisplay::drawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint3
 			err += dx;
 			y1 += sy;
 		}
+	}
+}
+
+void CSdlDisplay::swapBuffers()
+{
+	while (SDL_PollEvent(&_event))
+	{
+		switch (_event.type)
+		{
+			case SDL_MOUSEMOTION:
+			{
+				//printf("Mouse moved by %d,%d to (%d,%d)\n", _event.motion.xrel, _event.motion.yrel,	_event.motion.x, _event.motion.y);
+				break;
+			}
+			case SDL_MOUSEBUTTONDOWN:
+			{
+				//printf("Mouse button %d pressed at (%d,%d)\n", _event.button.button, _event.button.x, _event.button.y);
+				if (_treeMap && _rootItem)
+				{
+					CFpgaItem* item = dynamic_cast<CFpgaItem*>(_treeMap->FindItemByPoint(_rootItem, CPoint(_event.button.x, _event.button.y)));
+					if(item)
+					{
+						item->printHeirachy();
+					}
+				}
+				break;
+			}
+			case SDL_KEYDOWN:
+			{
+				switch(_event.key.keysym.sym)
+				{
+					case SDLK_d:
+					{
+						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::DSP);
+						_rootItem->recursivelyCalculateSize();
+						_rootItem->sort();
+						break;
+					}
+					case SDLK_r:
+					{
+						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::RAM);
+						_rootItem->recursivelyCalculateSize();
+						_rootItem->sort();
+						break;
+					}
+					case SDLK_l:
+					{
+						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::LUT);
+						_rootItem->recursivelyCalculateSize();
+						_rootItem->sort();
+						break;
+					}
+					case SDLK_s:
+					{
+						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::SLICE);
+						_rootItem->recursivelyCalculateSize();
+						_rootItem->sort();
+						break;
+					}
+					case SDLK_f:
+					{
+						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::REG);
+						_rootItem->recursivelyCalculateSize();
+						_rootItem->sort();
+						break;
+					}
+				}
+				break;
+			}
+			case SDL_QUIT:
+			{
+				exit(0);
+			}
+		}
+	}
+
+	SDL_Flip(_screen);
+
+	SDL_FillRect(_screen, NULL, 0);
+}
+
+uint32_t* CSdlDisplay::getScreen() const
+{
+	return static_cast<uint32_t*>(_screen->pixels);
+}
+
+void CSdlDisplay::run(CTreeMap* treemap, CFpgaItem* rootItem)
+{
+	_treeMap = treemap;
+	_rootItem = rootItem;
+	CTreeMap::Options options = CTreeMap::GetDefaultOptions();
+
+	_rootItem->recursivelyCalculateSize();
+	_rootItem->sort();
+
+	while (1)
+	{
+		_treeMap->DrawTreemap(this, CRect(0, 0, getWidth(), getHeight()), _rootItem, &options);
+		swapBuffers();
+		struct timespec ts;
+		ts.tv_sec = 0;
+		ts.tv_nsec = 1000000000 / 60;
+		nanosleep(&ts, NULL);
 	}
 }
 

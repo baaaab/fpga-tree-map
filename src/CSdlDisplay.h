@@ -6,6 +6,8 @@
 #include <mutex>
 
 class CRect;
+class CTreeMap;
+class CFpgaItem;
 
 class CSdlDisplay
 {
@@ -28,10 +30,14 @@ public:
 	void        swapBuffers          ();
 
 	uint32_t*   getScreen            () const;
+	void        run                  (CTreeMap* treemap, CFpgaItem* rootItem);
+
 
 private:
 
 	SDL_Surface* _screen;
+	CTreeMap* _treeMap;
+	CFpgaItem* _rootItem;
 
 	SDL_Event _event;
 	uint32_t _windowWidth;

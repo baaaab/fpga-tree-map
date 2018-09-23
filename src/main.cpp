@@ -26,21 +26,12 @@ int main(int argc, char** argv)
 	CMrpParser mrpParser(mapReport);
 	mrpParser.parse();
 
-	CSdlDisplay* display = new CSdlDisplay();
+	CFpgaItem* root = mrpParser.getItems();
 
-	CTreeMap::Options options = CTreeMap::GetDefaultOptions();
 	CTreeMap* treemap = new CTreeMap(NULL);
 
-	while(1)
-	{
-		treemap->DrawTreemap(display, CRect(0,0, display->getWidth(), display->getHeight()), mrpParser.getItems(), &options);
-		display->swapBuffers();
-		struct timespec ts;
-		ts.tv_sec = 0;
-		ts.tv_nsec = 1000000000/60;
-		nanosleep(&ts, NULL);
-	}
-
+	CSdlDisplay* display = new CSdlDisplay();
+	display->run(treemap, mrpParser.getItems());
 
 	return 0;
 }

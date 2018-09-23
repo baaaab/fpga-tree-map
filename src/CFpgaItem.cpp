@@ -1,11 +1,14 @@
 #include "CFpgaItem.h"
 
+#include <algorithm>
+
 EUtilisationMetric CFpgaItem::_UtilisationMetric = EUtilisationMetric::REG;
 
 CFpgaItem::CFpgaItem(const char* name, const CResourceUtilisation& ru, CFpgaItem* parent) :
 		_ru(ru),
 		_parent(parent),
-		_name(NULL)
+		_name(NULL),
+		_calculatedSize(0)
 {
 	uint32_t nameLength = strlen(name);
 	_name = new char[nameLength + 1];
@@ -41,7 +44,7 @@ uint32_t CFpgaItem::getDepth() const
 		depth++;
 		parent = parent->getParent();
 	}
-	return depth > 0 ? depth - 1 : depth;
+	return depth;
 }
 
 CResourceUtilisation& CFpgaItem::getResourceUtilisation()
@@ -54,6 +57,47 @@ const char* CFpgaItem::getName() const
 	return _name;
 }
 
+void CFpgaItem::printHeirachy() const
+{
+	uint32_t thisDepth = getDepth();
+	for (uint32_t depth = thisDepth - 1; depth > 0; depth--)
+	{
+		const CFpgaItem* item = this;
+		for (uint32_t i = 0; i < depth; i++)
+		{
+			item = item->getParent();
+		}
+		printf("  level: %3u %40s %6" PRIu64 "\n", item->getDepth(), item->getName(), item->TmiGetSize());
+	}
+	printf("* level: %3u %40s %6" PRIu64 "\n", getDepth(), getName(), TmiGetSize());
+}
+
+bool cmp(const CFpgaItem* a, const CFpgaItem* b)
+{
+	// rsort
+	return a->TmiGetSize() > b->TmiGetSize();
+}
+
+void CFpgaItem::sort()
+{
+	std::sort(_children.begin(), _children.end(), &cmp);
+	for(auto child : _children)
+	{
+		child->sort();
+	}
+}
+
+void CFpgaItem::recursivelyCalculateSize()
+{
+	uint64_t childSizes = 0;
+	for (auto child : _children)
+	{
+		child->recursivelyCalculateSize();
+		uint64_t childSize = child->TmiGetSize();
+		childSizes += childSize;
+	}
+}
+
 void CFpgaItem::addChild(CFpgaItem* child)
 {
 	_children.push_back(child);
@@ -61,7 +105,7 @@ void CFpgaItem::addChild(CFpgaItem* child)
 
 bool CFpgaItem::TmiIsLeaf() const
 {
-	return _children.empty();
+	return TmiGetChildrenCount() == 0;
 }
 
 CRect CFpgaItem::TmiGetRectangle() const
@@ -81,61 +125,78 @@ uint32_t CFpgaItem::TmiGetGraphColor() const
 
 int CFpgaItem::TmiGetChildrenCount() const
 {
-	return _children.size();
+	// must return num non zero size children
+	uint32_t count = 0;
+	for (auto child : _children)
+	{
+		if(child->TmiGetSize() > 0)
+		{
+			count ++;
+		}
+	}
+	return count;
 }
 
-CTreeMap::Item* CFpgaItem::TmiGetChild(int c) const
+CTreeMap::Item* CFpgaItem::TmiGetChild(int n) const
 {
-	return _children[c];
+	// must return n'th non zero size child
+	uint32_t count = 0;
+	for (auto child : _children)
+	{
+		if(child->TmiGetSize() > 0)
+		{
+			if(count == n)
+			{
+				return child;
+			}
+			count ++;
+		}
+	}
+	return NULL;
 }
 
 uint64_t CFpgaItem::TmiGetSize() const
 {
-	uint64_t childSizes = 0;
-	if (!TmiIsLeaf())
-	{
-		for (auto child : _children)
-		{
-			uint64_t childSize = child->TmiGetSize();
-			childSizes += childSize;
-		}
-	}
-	//printf("%40s, _ru.getRegisters() = %4u, childSizes = %u, total = %u\n", _name, _ru.getRegisters(), childSizes,  _ru.getRegisters() + childSizes);
-	switch (_UtilisationMetric)
-	{
-		case EUtilisationMetric::SLICE:
-			return childSizes + _ru.getSlices();
-		case EUtilisationMetric::REG:
-			return childSizes + _ru.getRegisters();
-		case EUtilisationMetric::LUT:
-			return childSizes + _ru.getLuts();
-		case EUtilisationMetric::RAM:
-			return childSizes + _ru.getRams();
-		case EUtilisationMetric::DSP:
-			return childSizes + _ru.getDsps();
-		default:
-			return 1;
-	}
+	return _calculatedSize;
 }
 
 void CFpgaItem::print(FILE* fh)
 {
 // indent
-uint32_t depth = getDepth();
-for (uint32_t i = 0; i < depth; i++)
-{
-	fputc('+', fh);
-}
+	uint32_t depth = getDepth();
+	for (uint32_t i = 0; i < depth; i++)
+	{
+		fputc('+', fh);
+	}
 
-fprintf(fh, "%40s, %6u, %6u, %6u, %4u, %4u\n", _name, _ru.getSlices(), _ru.getRegisters(), _ru.getLuts(), _ru.getRams(), _ru.getDsps());
-for (auto child : _children)
-{
-	child->print(fh);
-}
+	fprintf(fh, "%70s, %3u, , %" PRIu64 ", %6u, %6u, %6u, %4u, %4u\n", _name, TmiGetChildrenCount(), TmiGetSize(), _ru.getSlices(), _ru.getRegisters(), _ru.getLuts(), _ru.getRams(), _ru.getDsps());
+	for (auto child : _children)
+	{
+		child->print(fh);
+	}
 }
 
 void CFpgaItem::SetUtilisationMetric(EUtilisationMetric metric)
 {
-_UtilisationMetric = metric;
+	_UtilisationMetric = metric;
+}
+
+uint32_t CFpgaItem::getSelectedMetricSize() const
+{
+	switch (_UtilisationMetric)
+	{
+		case EUtilisationMetric::SLICE:
+			return _ru.getSlices();
+		case EUtilisationMetric::REG:
+			return _ru.getRegisters();
+		case EUtilisationMetric::LUT:
+			return _ru.getLuts();
+		case EUtilisationMetric::RAM:
+			return _ru.getRams();
+		case EUtilisationMetric::DSP:
+			return _ru.getDsps();
+		default:
+			return 0;
+	}
 }
 

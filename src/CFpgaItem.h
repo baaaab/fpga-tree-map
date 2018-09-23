@@ -17,6 +17,9 @@ public:
 	uint32_t getDepth() const;
 	CResourceUtilisation& getResourceUtilisation();
 	const char* getName() const;
+	void printHeirachy() const;
+	void sort();
+	void recursivelyCalculateSize();
 
 	// interface functions
 	bool            TmiIsLeaf          () const;
@@ -32,11 +35,14 @@ public:
 	static void SetUtilisationMetric(EUtilisationMetric metric);
 
 private:
+	uint32_t        getSelectedMetricSize() const;
+
 	CRect _rect;
 	std::vector<CFpgaItem*> _children;
 	CResourceUtilisation _ru;
 	CFpgaItem* _parent;
 	char* _name;
+	uint64_t _calculatedSize;
 
 	static EUtilisationMetric _UtilisationMetric;
 

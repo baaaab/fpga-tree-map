@@ -45,7 +45,7 @@ static const double PALETTE_BRIGHTNESS = 0.6;
 /////////////////////////////////////////////////////////////////////////////
 
 const CTreeMap::Options CTreeMap::_defaultOptions =
-{ KDirStatStyle, false, RGB(0, 0, 0), 0.88, 0.38, 0.91, 0.13, -1.0, -1.0 };
+{ SequoiaViewStyle, false, RGB(0, 0, 0), 0.88, 0.38, 0.91, 0.13, -1.0, -1.0 };
 
 const CTreeMap::Options CTreeMap::_defaultOptionsOld =
 { KDirStatStyle, false, RGB(0, 0, 0), 0.85, 0.4, 0.9, 0.15, -1.0, -1.0 };
@@ -843,8 +843,8 @@ void CTreeMap::SequoiaView_DrawChildren(CSdlDisplay* display, Item *parent, cons
 			break;
 		}
 	}
-	ASSERT(remainingSize == 0);
-	ASSERT(remaining.getLeft() == remaining.getRight() || remaining.getTop() == remaining.getBottom());
+	//ASSERT(remainingSize == 0);
+	//ASSERT(remaining.getLeft() == remaining.getRight() || remaining.getTop() == remaining.getBottom());
 }
 
 bool CTreeMap::IsCushionShading()
