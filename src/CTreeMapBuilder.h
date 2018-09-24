@@ -15,8 +15,6 @@ public:
 
 	void addElement(const char* elementId, const CResourceUtilisation& ru);
 
-	void sortItems();
-
 private:
 
 	CFpgaItem* _items;

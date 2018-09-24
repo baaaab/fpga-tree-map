@@ -1,8 +1,15 @@
 #ifndef SRC_CFPGAITEM_H_
 #define SRC_CFPGAITEM_H_
 
+#define __STDC_FORMAT_MACROS
+
+#include <cstdint>
+#include <cstdio>
+#include <vector>
+
 #include "CResourceUtilisation.h"
 #include "EUtilisationMetric.h"
+#include "windirstat/CRect.h"
 #include "windirstat/CTreeMap.h"
 
 class CFpgaItem : public CTreeMap::Item
@@ -18,6 +25,7 @@ public:
 	CResourceUtilisation& getResourceUtilisation();
 	const char* getName() const;
 	void printHeirachy() const;
+	void printTreeTo(const CFpgaItem* descendant) const;
 	void sort();
 	void recursivelyCalculateSize();
 
@@ -28,7 +36,8 @@ public:
 	uint32_t        TmiGetGraphColor   () const;
 	int             TmiGetChildrenCount() const;
 	CTreeMap::Item* TmiGetChild        (int c) const;
-	uint64_t        TmiGetSize         () const;
+	uint64_t        TmiGetLocalSize    () const;
+	uint64_t        TmiGetRecursiveSize() const;
 
 	void print(FILE* fh);
 
@@ -36,13 +45,14 @@ public:
 
 private:
 	uint32_t        getSelectedMetricSize() const;
+	bool            isAncestorOf(const CFpgaItem* other) const;
 
 	CRect _rect;
 	std::vector<CFpgaItem*> _children;
 	CResourceUtilisation _ru;
 	CFpgaItem* _parent;
 	char* _name;
-	uint64_t _calculatedSize;
+	uint64_t _sizeofChildren;;
 
 	static EUtilisationMetric _UtilisationMetric;
 

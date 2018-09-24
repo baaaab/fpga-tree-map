@@ -62,7 +62,8 @@ public:
 		virtual uint32_t TmiGetGraphColor() const = 0;
 		virtual int TmiGetChildrenCount() const = 0;
 		virtual Item *TmiGetChild(int c) const = 0;
-		virtual uint64_t TmiGetSize() const = 0;
+		virtual uint64_t TmiGetLocalSize() const = 0;
+		virtual uint64_t TmiGetRecursiveSize() const = 0;
 	};
 
 	//

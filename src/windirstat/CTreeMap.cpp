@@ -148,10 +148,10 @@ void CTreeMap::RecurseCheckTree(Item *item)
 		for(int i = 0; i < item->TmiGetChildrenCount(); i++)
 		{
 			Item *child = item->TmiGetChild(i);
-			sum += child->TmiGetSize();
+			sum += child->TmiGetRecursiveSize();
 			RecurseCheckTree(child);
 		}
-		ASSERT(sum == item->TmiGetSize());
+		ASSERT(sum == item->TmiGetRecursiveSize());
 	}
 }
 #endif
@@ -204,7 +204,7 @@ void CTreeMap::DrawTreemap(CSdlDisplay* display, CRect rc, Item *root, const Opt
 
 	m_renderArea = rc;
 
-	if (root->TmiGetSize() > 0)
+	if (root->TmiGetRecursiveSize() > 0)
 	{
 		double surface[4];
 		for (int i = 0; i < sizeof(surface)/sizeof(*surface); i++)
@@ -266,14 +266,14 @@ CTreeMap::Item *CTreeMap::FindItemByPoint(Item *item, CPoint point)
 	}
 	else
 	{
-		ASSERT(item->TmiGetSize() > 0);
+		ASSERT(item->TmiGetRecursiveSize() > 0);
 		ASSERT(item->TmiGetChildrenCount() > 0);
 
 		for (int i = 0; i < item->TmiGetChildrenCount(); i++)
 		{
 			Item *child = item->TmiGetChild(i);
 
-			ASSERT(child->TmiGetSize() > 0);
+			ASSERT(child->TmiGetRecursiveSize() > 0);
 
 #ifdef _DEBUG
 			CRect rcChild(child->TmiGetRectangle());
@@ -294,7 +294,7 @@ CTreeMap::Item *CTreeMap::FindItemByPoint(Item *item, CPoint point)
 				{
 					child = item->TmiGetChild(i);
 
-					if(child->TmiGetSize() == 0)
+					if(child->TmiGetRecursiveSize() == 0)
 					{
 						break;
 					}
@@ -321,6 +321,10 @@ CTreeMap::Item *CTreeMap::FindItemByPoint(Item *item, CPoint point)
 				break;
 			}
 		}
+	}
+	if(ret == NULL && item->TmiGetLocalSize())
+	{
+		return item;
 	}
 
 	ASSERT(ret != NULL);
@@ -364,7 +368,7 @@ void CTreeMap::RecurseDrawGraph(CSdlDisplay* display, Item *item, const CRect& r
 	ASSERT(rc.getWidth() >= 0);
 	ASSERT(rc.getHeight() >= 0);
 
-	ASSERT(item->TmiGetSize() > 0);
+	ASSERT(item->TmiGetRecursiveSize() > 0);
 
 	if (m_callback != NULL)
 	{
@@ -402,7 +406,12 @@ void CTreeMap::RecurseDrawGraph(CSdlDisplay* display, Item *item, const CRect& r
 	else
 	{
 		ASSERT(item->TmiGetChildrenCount() > 0);
-		ASSERT(item->TmiGetSize() > 0);
+		ASSERT(item->TmiGetRecursiveSize() > 0);
+
+		if(item->TmiGetLocalSize())
+		{
+			RenderLeaf(display, item, surface);
+		}
 
 		DrawChildren(display, item, surface, h, flags);
 	}
@@ -533,7 +542,7 @@ bool CTreeMap::KDirStat_ArrangeChildren(Item *parent, std::vector<double>& child
 	ASSERT(!parent->TmiIsLeaf());
 	ASSERT(parent->TmiGetChildrenCount() > 0);
 
-	if (parent->TmiGetSize() == 0)
+	if (parent->TmiGetRecursiveSize() == 0)
 	{
 		rows.push_back(1.0);
 		childrenPerRow.push_back(parent->TmiGetChildrenCount());
@@ -583,14 +592,14 @@ double CTreeMap::KDirStat_CalcutateNextRow(Item *parent, const int nextChild, do
 	ASSERT(nextChild < parent->TmiGetChildrenCount());
 	ASSERT(width >= 1.0);
 
-	const double mySize = (double) parent->TmiGetSize();
+	const double mySize = (double) parent->TmiGetRecursiveSize();
 	ASSERT(mySize > 0);
 	uint64_t sizeUsed = 0;
 	double rowHeight = 0;
 
 	for (i = nextChild; i < parent->TmiGetChildrenCount(); i++)
 	{
-		uint64_t childSize = parent->TmiGetChild(i)->TmiGetSize();
+		uint64_t childSize = parent->TmiGetChild(i)->TmiGetRecursiveSize();
 		if (childSize == 0)
 		{
 			ASSERT(i > nextChild);  // first child has size > 0
@@ -628,7 +637,7 @@ double CTreeMap::KDirStat_CalcutateNextRow(Item *parent, const int nextChild, do
 	// and rowHeight is the height of the row.
 
 	// We add the rest of the children, if their size is 0.
-	while (i < parent->TmiGetChildrenCount() && parent->TmiGetChild(i)->TmiGetSize() == 0)
+	while (i < parent->TmiGetChildrenCount() && parent->TmiGetChild(i)->TmiGetRecursiveSize() == 0)
 	{
 		i++;
 	}
@@ -640,7 +649,7 @@ double CTreeMap::KDirStat_CalcutateNextRow(Item *parent, const int nextChild, do
 	{
 		// Rectangle(1.0 * 1.0) = mySize
 		double rowSize = mySize * rowHeight;
-		double childSize = (double) parent->TmiGetChild(nextChild + i)->TmiGetSize();
+		double childSize = (double) parent->TmiGetChild(nextChild + i)->TmiGetRecursiveSize();
 		double cw = childSize / rowSize;
 		ASSERT(cw >= 0);
 		childWidth[nextChild + i] = cw;
@@ -660,11 +669,11 @@ void CTreeMap::SequoiaView_DrawChildren(CSdlDisplay* display, Item *parent, cons
 	ASSERT(remaining.getHeight() > 0);
 
 	// Size of rest rectangle
-	uint64_t remainingSize = parent->TmiGetSize();
+	uint64_t remainingSize = parent->TmiGetRecursiveSize();
 	ASSERT(remainingSize > 0);
 
 	// Scale factor
-	const double sizePerSquarePixel = (double) parent->TmiGetSize() / remaining.getWidth() / remaining.getHeight();
+	const double sizePerSquarePixel = (double) parent->TmiGetRecursiveSize() / remaining.getWidth() / remaining.getHeight();
 
 	// First child for next row
 	int head = 0;
@@ -693,7 +702,7 @@ void CTreeMap::SequoiaView_DrawChildren(CSdlDisplay* display, Item *parent, cons
 		double worst = std::numeric_limits<double>::max();
 
 		// Maximum size of children in row
-		uint64_t rmax = parent->TmiGetChild(rowBegin)->TmiGetSize();
+		uint64_t rmax = parent->TmiGetChild(rowBegin)->TmiGetRecursiveSize();
 
 		// Sum of sizes of children in row
 		uint64_t sum = 0;
@@ -704,7 +713,7 @@ void CTreeMap::SequoiaView_DrawChildren(CSdlDisplay* display, Item *parent, cons
 			// We check a virtual row made up of child(rowBegin)...child(rowEnd) here.
 
 			// Minimum size of child in virtual row
-			uint64_t rmin = parent->TmiGetChild(rowEnd)->TmiGetSize();
+			uint64_t rmin = parent->TmiGetChild(rowEnd)->TmiGetRecursiveSize();
 
 			// If sizes of the rest of the children is zero, we add all of them
 			if (rmin == 0)
@@ -775,11 +784,11 @@ void CTreeMap::SequoiaView_DrawChildren(CSdlDisplay* display, Item *parent, cons
 		for (int i = rowBegin; i < rowEnd; i++)
 		{
 			int begin = (int) fBegin;
-			double fraction = (double) (parent->TmiGetChild(i)->TmiGetSize()) / sum;
+			double fraction = (double) (parent->TmiGetChild(i)->TmiGetRecursiveSize()) / sum;
 			double fEnd = fBegin + fraction * height;
 			int end = (int) fEnd;
 
-			bool lastChild = (i == rowEnd - 1 || parent->TmiGetChild(i + 1)->TmiGetSize() == 0);
+			bool lastChild = (i == rowEnd - 1 || parent->TmiGetChild(i + 1)->TmiGetRecursiveSize() == 0);
 
 			if (lastChild)
 			{

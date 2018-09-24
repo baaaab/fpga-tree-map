@@ -15,6 +15,8 @@ CSdlDisplay::CSdlDisplay() :
 		_screen(NULL),
 		_treeMap(NULL),
 		_rootItem(NULL),
+		_selectedItem(NULL),
+		_redrawRequired(false),
 		_windowWidth(900),
 		_windowHeight(900)
 {
@@ -81,29 +83,6 @@ void CSdlDisplay::drawRectEdge(const CRect& rect, uint32_t colour)
 	drawStraightLine(rect.getRight(), rect.getTop(), rect.getRight(), rect.getBottom(), colour);
 }
 
-void CSdlDisplay::drawRectangle(int x1, int y1, int x2, int y2, uint32_t pixel)
-{
-	if (y1 > y2)
-	{
-		int temp = y2;
-		y2 = y1;
-		y1 = temp;
-	}
-	if (x1 > x2)
-	{
-		int temp = x2;
-		x2 = x1;
-		x1 = temp;
-	}
-	for (int y = y1; y < y2; y++)
-	{
-		for (int x = x1; x < x2; x++)
-		{
-			setPixel(x, y, pixel);
-		}
-	}
-}
-
 void CSdlDisplay::drawStraightLine(int x1, int y1, int x2, int y2, uint32_t pixel)
 {
 	if (y1 > y2)
@@ -161,6 +140,49 @@ void CSdlDisplay::drawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint3
 
 void CSdlDisplay::swapBuffers()
 {
+	SDL_Flip(_screen);
+	SDL_FillRect(_screen, NULL, 0);
+}
+
+uint32_t* CSdlDisplay::getScreen() const
+{
+	return static_cast<uint32_t*>(_screen->pixels);
+}
+
+void CSdlDisplay::run(CTreeMap* treemap, CFpgaItem* rootItem)
+{
+	_selectedItem = rootItem;
+	_treeMap = treemap;
+	_rootItem = rootItem;
+	CTreeMap::Options options = CTreeMap::GetDefaultOptions();
+
+	_rootItem->recursivelyCalculateSize();
+	_rootItem->sort();
+
+	_redrawRequired = true;
+
+	while (1)
+	{
+		handleEvents();
+		if(_redrawRequired)
+		{
+			_treeMap->DrawTreemap(this, CRect(0, 0, getWidth(), getHeight()), _rootItem, &options);
+			if(_selectedItem)
+			{
+				drawRectEdge(_selectedItem->TmiGetRectangle(), 0xffffffff);
+			}
+			swapBuffers();
+			_redrawRequired = false;
+		}
+		struct timespec ts;
+		ts.tv_sec = 0;
+		ts.tv_nsec = 1000000000 / 60;
+		nanosleep(&ts, NULL);
+	}
+}
+
+void CSdlDisplay::handleEvents()
+{
 	while (SDL_PollEvent(&_event))
 	{
 		switch (_event.type)
@@ -176,22 +198,25 @@ void CSdlDisplay::swapBuffers()
 				if (_treeMap && _rootItem)
 				{
 					CFpgaItem* item = dynamic_cast<CFpgaItem*>(_treeMap->FindItemByPoint(_rootItem, CPoint(_event.button.x, _event.button.y)));
-					if(item)
+					if (item)
 					{
-						item->printHeirachy();
+						_selectedItem = item;
+						_selectedItem->printHeirachy();
+						_redrawRequired = true;
 					}
 				}
 				break;
 			}
 			case SDL_KEYDOWN:
 			{
-				switch(_event.key.keysym.sym)
+				switch (_event.key.keysym.sym)
 				{
 					case SDLK_d:
 					{
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::DSP);
 						_rootItem->recursivelyCalculateSize();
 						_rootItem->sort();
+						_redrawRequired = true;
 						break;
 					}
 					case SDLK_r:
@@ -199,6 +224,7 @@ void CSdlDisplay::swapBuffers()
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::RAM);
 						_rootItem->recursivelyCalculateSize();
 						_rootItem->sort();
+						_redrawRequired = true;
 						break;
 					}
 					case SDLK_l:
@@ -206,6 +232,7 @@ void CSdlDisplay::swapBuffers()
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::LUT);
 						_rootItem->recursivelyCalculateSize();
 						_rootItem->sort();
+						_redrawRequired = true;
 						break;
 					}
 					case SDLK_s:
@@ -213,6 +240,7 @@ void CSdlDisplay::swapBuffers()
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::SLICE);
 						_rootItem->recursivelyCalculateSize();
 						_rootItem->sort();
+						_redrawRequired = true;
 						break;
 					}
 					case SDLK_f:
@@ -220,7 +248,42 @@ void CSdlDisplay::swapBuffers()
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::REG);
 						_rootItem->recursivelyCalculateSize();
 						_rootItem->sort();
+						_redrawRequired = true;
 						break;
+					}
+					case SDLK_LEFT:
+					{
+						// select parent
+						if (_selectedItem && _selectedItem->getParent())
+						{
+							_selectedItem = _selectedItem->getParent();
+							_selectedItem->printHeirachy();
+							_redrawRequired = true;
+						}
+					}
+					case SDLK_DOWN:
+					{
+						// select next sibling, or parent's next child
+						if (_selectedItem)
+						{
+							// not implemented
+						}
+					}
+					case SDLK_UP:
+					{
+						// select previous sibling, of parent when first sibling
+						if (_selectedItem)
+						{
+							// not implemented
+						}
+					}
+					case SDLK_RIGHT:
+					{
+						// select first child
+						if (_selectedItem)
+						{
+							// not implemented
+						}
 					}
 				}
 				break;
@@ -230,35 +293,6 @@ void CSdlDisplay::swapBuffers()
 				exit(0);
 			}
 		}
-	}
-
-	SDL_Flip(_screen);
-
-	SDL_FillRect(_screen, NULL, 0);
-}
-
-uint32_t* CSdlDisplay::getScreen() const
-{
-	return static_cast<uint32_t*>(_screen->pixels);
-}
-
-void CSdlDisplay::run(CTreeMap* treemap, CFpgaItem* rootItem)
-{
-	_treeMap = treemap;
-	_rootItem = rootItem;
-	CTreeMap::Options options = CTreeMap::GetDefaultOptions();
-
-	_rootItem->recursivelyCalculateSize();
-	_rootItem->sort();
-
-	while (1)
-	{
-		_treeMap->DrawTreemap(this, CRect(0, 0, getWidth(), getHeight()), _rootItem, &options);
-		swapBuffers();
-		struct timespec ts;
-		ts.tv_sec = 0;
-		ts.tv_nsec = 1000000000 / 60;
-		nanosleep(&ts, NULL);
 	}
 }
 

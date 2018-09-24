@@ -101,7 +101,7 @@ bool CMrpParser::parse()
 			}
 			case ESection::UTILISATION_BY_HEIRACHY:
 			{
-				char* module = strtok(line, "| ");
+				char* module = strtok(line, "|");
 				strtok(NULL, "|"); // partition
 				char* slices = strtok(NULL, "|");
 				char* registers = strtok(NULL, "|");
@@ -117,7 +117,23 @@ bool CMrpParser::parse()
 				}
 				else if(headerRowSeen && module && slices && registers && luts && rams && dsps)
 				{
-					printf("%s, %s, %s, %s, %s, %s\n", module, slices, registers, luts, rams, dsps);
+					char* trimmedModule = module;
+					if(*module)
+					{
+						// skip leading space character
+						module++;
+						trimmedModule++;
+						while(*trimmedModule)
+						{
+							if(*trimmedModule == ' ')
+							{
+								*trimmedModule = 0;
+								break;
+							}
+							trimmedModule++;
+						}
+					}
+					//printf("\"%s\", %s, %s, %s, %s, %s\n", module, slices, registers, luts, rams, dsps);
 					CResourceUtilisation ru;
 					ru.getSlices() = strtoul(slices, NULL, 10);
 					ru.getRegisters() = strtoul(registers, NULL, 10);
@@ -132,7 +148,7 @@ bool CMrpParser::parse()
 		}
 	}
 
-	_items->print(stdout);
+	//_items->print(stdout);
 
 	if(section != ESection::UTILISATION_BY_HEIRACHY)
 	{

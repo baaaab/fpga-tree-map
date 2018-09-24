@@ -18,7 +18,6 @@ public:
 	uint32_t    getWidth             () const;
 	uint32_t    getHeight            () const;
 
-	void        drawRectangle        (int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t pixel);
 	void        setPixel             (int32_t x, int32_t y, uint32_t pixel);
 	void        drawStraightLine     (int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t pixel);
 	void        drawLine             (int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t pixel);
@@ -32,16 +31,19 @@ public:
 	uint32_t*   getScreen            () const;
 	void        run                  (CTreeMap* treemap, CFpgaItem* rootItem);
 
-
 private:
 
 	SDL_Surface* _screen;
 	CTreeMap* _treeMap;
 	CFpgaItem* _rootItem;
+	CFpgaItem* _selectedItem;
+	bool _redrawRequired;
 
 	SDL_Event _event;
 	uint32_t _windowWidth;
 	uint32_t _windowHeight;
+
+	void handleEvents();
 
 };
 

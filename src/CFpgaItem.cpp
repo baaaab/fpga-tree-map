@@ -1,6 +1,9 @@
 #include "CFpgaItem.h"
 
+#include <cstdint>
 #include <algorithm>
+#include <cinttypes>
+#include <cstring>
 
 EUtilisationMetric CFpgaItem::_UtilisationMetric = EUtilisationMetric::REG;
 
@@ -8,7 +11,7 @@ CFpgaItem::CFpgaItem(const char* name, const CResourceUtilisation& ru, CFpgaItem
 		_ru(ru),
 		_parent(parent),
 		_name(NULL),
-		_calculatedSize(0)
+		_sizeofChildren(0)
 {
 	uint32_t nameLength = strlen(name);
 	_name = new char[nameLength + 1];
@@ -59,23 +62,51 @@ const char* CFpgaItem::getName() const
 
 void CFpgaItem::printHeirachy() const
 {
-	uint32_t thisDepth = getDepth();
-	for (uint32_t depth = thisDepth - 1; depth > 0; depth--)
+	puts("---------------------------------------------");
+	const CFpgaItem* root = this;
+	while(root->getParent())
 	{
-		const CFpgaItem* item = this;
-		for (uint32_t i = 0; i < depth; i++)
-		{
-			item = item->getParent();
-		}
-		printf("  level: %3u %40s %6" PRIu64 "\n", item->getDepth(), item->getName(), item->TmiGetSize());
+		root = root->getParent();
 	}
-	printf("* level: %3u %40s %6" PRIu64 "\n", getDepth(), getName(), TmiGetSize());
+	printf("%c %6" PRIu64 " : %-40s\n", root->isAncestorOf(this) ? '+' : '-', root->TmiGetRecursiveSize(), root->getName());
+	root->printTreeTo(this);
+}
+
+void CFpgaItem::printTreeTo(const CFpgaItem* descendant) const
+{
+	if (this == descendant)
+	{
+		return;
+	}
+	uint32_t depth = getDepth();
+	uint32_t numChildren = TmiGetChildrenCount();
+	for (uint32_t c = 0; c < numChildren; c++)
+	{
+		const CFpgaItem* child = dynamic_cast<const CFpgaItem*>(TmiGetChild(c));
+		for (uint32_t d = 0; d < depth + 1; d++)
+		{
+			if(descendant == child)
+			{
+				fputs("**", stdout);
+			}
+			else
+			{
+				fputs("  ", stdout);
+			}
+		}
+		bool isDescendant = descendant->isAncestorOf(child);
+		printf("%c %6" PRIu64 " : %-40s\n", child->TmiIsLeaf() ? ' ' : isDescendant ? '+' : '-', child->TmiGetRecursiveSize(), child->getName());
+		if(isDescendant)
+		{
+			child->printTreeTo(descendant);
+		}
+	}
 }
 
 bool cmp(const CFpgaItem* a, const CFpgaItem* b)
 {
 	// rsort
-	return a->TmiGetSize() > b->TmiGetSize();
+	return a->TmiGetRecursiveSize() > b->TmiGetRecursiveSize();
 }
 
 void CFpgaItem::sort()
@@ -93,9 +124,10 @@ void CFpgaItem::recursivelyCalculateSize()
 	for (auto child : _children)
 	{
 		child->recursivelyCalculateSize();
-		uint64_t childSize = child->TmiGetSize();
+		uint64_t childSize = child->TmiGetRecursiveSize();
 		childSizes += childSize;
 	}
+	_sizeofChildren = childSizes;
 }
 
 void CFpgaItem::addChild(CFpgaItem* child)
@@ -129,7 +161,7 @@ int CFpgaItem::TmiGetChildrenCount() const
 	uint32_t count = 0;
 	for (auto child : _children)
 	{
-		if(child->TmiGetSize() > 0)
+		if(child->TmiGetRecursiveSize() > 0)
 		{
 			count ++;
 		}
@@ -143,7 +175,7 @@ CTreeMap::Item* CFpgaItem::TmiGetChild(int n) const
 	uint32_t count = 0;
 	for (auto child : _children)
 	{
-		if(child->TmiGetSize() > 0)
+		if(child->TmiGetRecursiveSize() > 0)
 		{
 			if(count == n)
 			{
@@ -155,9 +187,14 @@ CTreeMap::Item* CFpgaItem::TmiGetChild(int n) const
 	return NULL;
 }
 
-uint64_t CFpgaItem::TmiGetSize() const
+uint64_t CFpgaItem::TmiGetLocalSize() const
 {
-	return _calculatedSize;
+	return getSelectedMetricSize();
+}
+
+uint64_t CFpgaItem::TmiGetRecursiveSize() const
+{
+	return getSelectedMetricSize() + _sizeofChildren;
 }
 
 void CFpgaItem::print(FILE* fh)
@@ -169,7 +206,7 @@ void CFpgaItem::print(FILE* fh)
 		fputc('+', fh);
 	}
 
-	fprintf(fh, "%70s, %3u, , %" PRIu64 ", %6u, %6u, %6u, %4u, %4u\n", _name, TmiGetChildrenCount(), TmiGetSize(), _ru.getSlices(), _ru.getRegisters(), _ru.getLuts(), _ru.getRams(), _ru.getDsps());
+	fprintf(fh, "%70s, %3u, , %" PRIu64 ", %6u, %6u, %6u, %4u, %4u\n", _name, TmiGetChildrenCount(), TmiGetRecursiveSize(), _ru.getSlices(), _ru.getRegisters(), _ru.getLuts(), _ru.getRams(), _ru.getDsps());
 	for (auto child : _children)
 	{
 		child->print(fh);
@@ -198,5 +235,19 @@ uint32_t CFpgaItem::getSelectedMetricSize() const
 		default:
 			return 0;
 	}
+}
+
+bool CFpgaItem::isAncestorOf(const CFpgaItem* other) const
+{
+	const CFpgaItem* item = this;
+	while(item->getParent())
+	{
+		if(item->getParent() == other)
+		{
+			return true;
+		}
+		item = item->getParent();
+	}
+	return false;
 }
 
