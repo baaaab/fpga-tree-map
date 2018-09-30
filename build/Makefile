@@ -1,4 +1,4 @@
-TARGET=mrpParser
+TARGET=fpga-tree-map
 
 BUILDDIR := $(shell pwd)
 VPATH = $(shell find ../src -type d)
@@ -9,7 +9,7 @@ OBJECTS := $(addprefix $(BUILDDIR)/,$(notdir $(SOURCES:%.cpp=%.o)))
 
 CC=g++
 LD=g++
-CFLAGS=-MMD -std=c++11
+CFLAGS=-MMD -std=c++11 -O2 -ffast-math # -ggdb -O0 -fno-inline
 CFLAGS+=-I../include
 LDFLAGS= -lSDL -lX11
 all: $(TARGET)

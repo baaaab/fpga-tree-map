@@ -20,7 +20,10 @@ public:
 
 	void addChild(CFpgaItem* child);
 	void clear();
+	CFpgaItem* getChild(int c) const;
 	CFpgaItem* getParent() const;
+	CFpgaItem* getPreviousSibling() const;
+	CFpgaItem* getNextSibling() const;
 	uint32_t getDepth() const;
 	CResourceUtilisation& getResourceUtilisation();
 	const char* getName() const;
@@ -28,6 +31,7 @@ public:
 	void printTreeTo(const CFpgaItem* descendant) const;
 	void sort();
 	void recursivelyCalculateSize();
+	void setColour(uint32_t colour);
 
 	// interface functions
 	bool            TmiIsLeaf          () const;
@@ -53,6 +57,7 @@ private:
 	CFpgaItem* _parent;
 	char* _name;
 	uint64_t _sizeofChildren;;
+	uint32_t _colour;
 
 	static EUtilisationMetric _UtilisationMetric;
 

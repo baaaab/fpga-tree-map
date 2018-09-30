@@ -11,9 +11,7 @@ CMrpParser::CMrpParser(const char* mapReport) :
 		_items(NULL),
 		_treeMapBuilder(NULL)
 {
-	CResourceUtilisation ru;
-	_items = new CFpgaItem("root", ru, NULL);
-	_treeMapBuilder = new CTreeMapBuilder(_items);
+
 }
 
 CMrpParser::~CMrpParser()
@@ -78,6 +76,36 @@ bool CMrpParser::parse()
 				if(strcmp(line, "Table of Contents\n") == 0)
 				{
 					section = ESection::TABLE_OF_CONTENTS;
+
+					_used.getDsps() = usedDspE1s + usedDspA1s;
+					_total.getDsps() = totalDspE1s + totalDspA1s;
+					if (totalRam8s != 0)
+					{
+						_used.getRams() = usedRam8s + 2 * usedRam16s;
+						_total.getRams() = totalRam8s;
+					}
+					else if (totalRam18s != 0)
+					{
+						_used.getRams() = usedRam18s + 2 * usedRam36s;
+						_total.getRams() = totalRam18s;
+					}
+
+					printf("Slices      : %6u / %6u (%2.1f%%)\n", _used.getSlices(), _total.getSlices(), 100.0f * _used.getSlices() / (float) (std::max(1U, _total.getSlices())));
+					printf("  Luts      : %6u / %6u (%2.1f%%)\n", _used.getLuts(), _total.getLuts(), 100.0f * _used.getLuts() / (float) (std::max(1U, _total.getLuts())));
+					printf("  Registers : %6u / %6u (%2.1f%%)\n", _used.getRegisters(), _total.getRegisters(), 100.0f * _used.getRegisters() / (float) (std::max(1U, _total.getRegisters())));
+					printf("RAMs        : %6u / %6u (%2.1f%%)\n", _used.getRams(), _total.getRams(), 100.0f * _used.getRams() / (float) (std::max(1U, _total.getRams())));
+					printf("DSPs        : %6u / %6u (%2.1f%%)\n", _used.getDsps(), _total.getDsps(), 100.0f * _used.getDsps() / (float) (std::max(1U, _total.getDsps())));
+
+					CResourceUtilisation unusedResources;
+					unusedResources.getSlices() = _total.getSlices() - _used.getSlices();
+					unusedResources.getLuts() = _total.getLuts() - _used.getLuts();
+					unusedResources.getRegisters() = _total.getRegisters() - _used.getRegisters();
+					unusedResources.getRams() = _total.getRams() - _used.getRams();
+					unusedResources.getDsps() = _total.getDsps() - _used.getDsps();
+					CFpgaItem* unused = new CFpgaItem("[UNUSED RESOURCES]", unusedResources, NULL);
+					unused->setColour(0xaaaaaa);
+					_treeMapBuilder = new CTreeMapBuilder(unused);
+					_items = unused;
 				}
 				break;
 			}
@@ -155,25 +183,6 @@ bool CMrpParser::parse()
 		fprintf(stderr, "Unable to find \"Section 13 - Utilization by Hierarchy\" in MAP Report. Is this a detailed MAP report?\n");
 		exit(1);
 	}
-
-	_used.getDsps() = usedDspE1s + usedDspA1s;
-	_total.getDsps() = totalDspE1s + totalDspA1s;
-	if(totalRam8s != 0)
-	{
-		_used.getRams() = usedRam8s + 2 * usedRam16s;
-		_total.getRams() = totalRam8s;
-	}
-	else if(totalRam18s != 0)
-	{
-		_used.getRams() = usedRam18s + 2 * usedRam36s;
-		_total.getRams() = totalRam18s;
-	}
-
-	printf("Slices      : %6u / %6u (%2.1f%%)\n", _used.getSlices(), _total.getSlices(), 100.0f * _used.getSlices() / (float) (std::max(1U, _total.getSlices())));
-	printf("  Luts      : %6u / %6u (%2.1f%%)\n", _used.getLuts(), _total.getLuts(), 100.0f * _used.getLuts() / (float) (std::max(1U, _total.getLuts())));
-	printf("  Registers : %6u / %6u (%2.1f%%)\n", _used.getRegisters(), _total.getRegisters(), 100.0f * _used.getRegisters() / (float) (std::max(1U, _total.getRegisters())));
-	printf("RAMs        : %6u / %6u (%2.1f%%)\n", _used.getRams(), _total.getRams(), 100.0f * _used.getRams() / (float) (std::max(1U, _total.getRams())));
-	printf("DSPs        : %6u / %6u (%2.1f%%)\n", _used.getDsps(), _total.getDsps(), 100.0f * _used.getDsps() / (float) (std::max(1U, _total.getDsps())));
 
 	fclose(fh);
 	return true;

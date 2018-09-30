@@ -11,7 +11,8 @@ CFpgaItem::CFpgaItem(const char* name, const CResourceUtilisation& ru, CFpgaItem
 		_ru(ru),
 		_parent(parent),
 		_name(NULL),
-		_sizeofChildren(0)
+		_sizeofChildren(0),
+		_colour(0x00aa00)
 {
 	uint32_t nameLength = strlen(name);
 	_name = new char[nameLength + 1];
@@ -33,9 +34,73 @@ void CFpgaItem::clear()
 	_children.clear();
 }
 
+CFpgaItem* CFpgaItem::getChild(int n) const
+{
+	// must return n'th non zero size child
+	uint32_t count = 0;
+	for (auto child : _children)
+	{
+		if(child->TmiGetRecursiveSize() > 0)
+		{
+			if(count == n)
+			{
+				return child;
+			}
+			count ++;
+		}
+	}
+	return NULL;
+}
+
 CFpgaItem* CFpgaItem::getParent() const
 {
 	return _parent;
+}
+
+CFpgaItem* CFpgaItem::getPreviousSibling() const
+{
+	if (_parent)
+	{
+		uint32_t numSiblings = _parent->TmiGetChildrenCount();
+		for (uint32_t index = 0; index < numSiblings; index++)
+		{
+			if (_parent->getChild(index) == this)
+			{
+				if (index != 0)
+				{
+					return _parent->getChild(index - 1);
+				}
+				else
+				{
+					return _parent;
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+CFpgaItem* CFpgaItem::getNextSibling() const
+{
+	if (_parent)
+	{
+		uint32_t numSiblings = _parent->TmiGetChildrenCount();
+		for (uint32_t index = 0; index < numSiblings; index++)
+		{
+			if (_parent->getChild(index) == this)
+			{
+				if (index != numSiblings - 1)
+				{
+					return _parent->getChild(index + 1);
+				}
+				else
+				{
+					return _parent->getNextSibling();
+				}
+			}
+		}
+	}
+	return NULL;
 }
 
 uint32_t CFpgaItem::getDepth() const
@@ -68,7 +133,7 @@ void CFpgaItem::printHeirachy() const
 	{
 		root = root->getParent();
 	}
-	printf("%c %6" PRIu64 " : %-40s\n", root->isAncestorOf(this) ? '+' : '-', root->TmiGetRecursiveSize(), root->getName());
+	printf("%c %6" PRIu64 " : %-40s\n", root->isAncestorOf(this) ? '-' : '+', root->TmiGetRecursiveSize(), root->getName());
 	root->printTreeTo(this);
 }
 
@@ -82,7 +147,7 @@ void CFpgaItem::printTreeTo(const CFpgaItem* descendant) const
 	uint32_t numChildren = TmiGetChildrenCount();
 	for (uint32_t c = 0; c < numChildren; c++)
 	{
-		const CFpgaItem* child = dynamic_cast<const CFpgaItem*>(TmiGetChild(c));
+		const CFpgaItem* child = getChild(c);
 		for (uint32_t d = 0; d < depth + 1; d++)
 		{
 			if(descendant == child)
@@ -95,7 +160,7 @@ void CFpgaItem::printTreeTo(const CFpgaItem* descendant) const
 			}
 		}
 		bool isDescendant = descendant->isAncestorOf(child);
-		printf("%c %6" PRIu64 " : %-40s\n", child->TmiIsLeaf() ? ' ' : isDescendant ? '+' : '-', child->TmiGetRecursiveSize(), child->getName());
+		printf("%c %6" PRIu64 " : %-40s\n", child->TmiIsLeaf() ? ' ' : isDescendant ? '-' : '+', child->TmiGetRecursiveSize(), child->getName());
 		if(isDescendant)
 		{
 			child->printTreeTo(descendant);
@@ -130,6 +195,11 @@ void CFpgaItem::recursivelyCalculateSize()
 	_sizeofChildren = childSizes;
 }
 
+void CFpgaItem::setColour(uint32_t colour)
+{
+	_colour = colour;
+}
+
 void CFpgaItem::addChild(CFpgaItem* child)
 {
 	_children.push_back(child);
@@ -152,7 +222,7 @@ void CFpgaItem::TmiSetRectangle(const CRect& rc)
 
 uint32_t CFpgaItem::TmiGetGraphColor() const
 {
-	return 0x00aa00;
+	return _colour;
 }
 
 int CFpgaItem::TmiGetChildrenCount() const
@@ -171,20 +241,7 @@ int CFpgaItem::TmiGetChildrenCount() const
 
 CTreeMap::Item* CFpgaItem::TmiGetChild(int n) const
 {
-	// must return n'th non zero size child
-	uint32_t count = 0;
-	for (auto child : _children)
-	{
-		if(child->TmiGetRecursiveSize() > 0)
-		{
-			if(count == n)
-			{
-				return child;
-			}
-			count ++;
-		}
-	}
-	return NULL;
+	return getChild(n);
 }
 
 uint64_t CFpgaItem::TmiGetLocalSize() const

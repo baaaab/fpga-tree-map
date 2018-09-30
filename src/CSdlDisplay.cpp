@@ -12,11 +12,14 @@
 #include "CFpgaItem.h"
 
 CSdlDisplay::CSdlDisplay() :
+		_treeMapImage(NULL),
 		_screen(NULL),
 		_treeMap(NULL),
-		_rootItem(NULL),
+		_unusedItem(NULL),
 		_selectedItem(NULL),
-		_redrawRequired(false),
+		_itemToDraw(NULL),
+		_treeMapRedrawRequired(false),
+		_selectedRedrawRequired(false),
 		_windowWidth(900),
 		_windowHeight(900)
 {
@@ -34,11 +37,15 @@ CSdlDisplay::CSdlDisplay() :
 		exit(1);
 	}
 	SDL_WM_SetCaption("Unusual Object Detector", "Unusual Object Detector");
+
+	_treeMapImage = new uint8_t[_windowHeight * _windowWidth * 4];
 }
 
 CSdlDisplay::~CSdlDisplay()
 {
-	SDL_Quit();
+	delete[] _treeMapImage;
+
+	SDL_QUIT();
 }
 
 uint32_t CSdlDisplay::getWidth() const
@@ -149,30 +156,42 @@ uint32_t* CSdlDisplay::getScreen() const
 	return static_cast<uint32_t*>(_screen->pixels);
 }
 
-void CSdlDisplay::run(CTreeMap* treemap, CFpgaItem* rootItem)
+void CSdlDisplay::run(CTreeMap* treemap, CFpgaItem* unusedItem)
 {
-	_selectedItem = rootItem;
+
 	_treeMap = treemap;
-	_rootItem = rootItem;
+	_unusedItem = unusedItem;
+	_itemToDraw = _unusedItem;
+	_selectedItem = _unusedItem;
 	CTreeMap::Options options = CTreeMap::GetDefaultOptions();
 
-	_rootItem->recursivelyCalculateSize();
-	_rootItem->sort();
+	_unusedItem->recursivelyCalculateSize();
+	_unusedItem->sort();
 
-	_redrawRequired = true;
+	_treeMapRedrawRequired = true;
 
 	while (1)
 	{
 		handleEvents();
-		if(_redrawRequired)
+		if (_treeMapRedrawRequired)
 		{
-			_treeMap->DrawTreemap(this, CRect(0, 0, getWidth(), getHeight()), _rootItem, &options);
-			if(_selectedItem)
+			_treeMap->DrawTreemap(this, CRect(0, 0, getWidth(), getHeight()), _itemToDraw, &options);
+			memcpy(_treeMapImage, _screen->pixels, _windowHeight * _windowWidth * 4);
+			_treeMapRedrawRequired = false;
+			_selectedRedrawRequired = true;
+		}
+		else
+		{
+			if (_selectedRedrawRequired)
 			{
-				drawRectEdge(_selectedItem->TmiGetRectangle(), 0xffffffff);
+				memcpy(_screen->pixels, _treeMapImage, _windowHeight * _windowWidth * 4);
 			}
+		}
+		if (_selectedRedrawRequired && _selectedItem)
+		{
+			drawRectEdge(_selectedItem->TmiGetRectangle(), 0xffffffff);
 			swapBuffers();
-			_redrawRequired = false;
+			_selectedRedrawRequired = false;
 		}
 		struct timespec ts;
 		ts.tv_sec = 0;
@@ -195,14 +214,14 @@ void CSdlDisplay::handleEvents()
 			case SDL_MOUSEBUTTONDOWN:
 			{
 				//printf("Mouse button %d pressed at (%d,%d)\n", _event.button.button, _event.button.x, _event.button.y);
-				if (_treeMap && _rootItem)
+				if (_treeMap && _itemToDraw)
 				{
-					CFpgaItem* item = dynamic_cast<CFpgaItem*>(_treeMap->FindItemByPoint(_rootItem, CPoint(_event.button.x, _event.button.y)));
+					CFpgaItem* item = dynamic_cast<CFpgaItem*>(_treeMap->FindItemByPoint(_itemToDraw, CPoint(_event.button.x, _event.button.y)));
 					if (item)
 					{
 						_selectedItem = item;
 						_selectedItem->printHeirachy();
-						_redrawRequired = true;
+						_selectedRedrawRequired = true;
 					}
 				}
 				break;
@@ -214,41 +233,54 @@ void CSdlDisplay::handleEvents()
 					case SDLK_d:
 					{
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::DSP);
-						_rootItem->recursivelyCalculateSize();
-						_rootItem->sort();
-						_redrawRequired = true;
+						_unusedItem->recursivelyCalculateSize();
+						_unusedItem->sort();
+						_treeMapRedrawRequired = true;
 						break;
 					}
 					case SDLK_r:
 					{
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::RAM);
-						_rootItem->recursivelyCalculateSize();
-						_rootItem->sort();
-						_redrawRequired = true;
+						_unusedItem->recursivelyCalculateSize();
+						_unusedItem->sort();
+						_treeMapRedrawRequired = true;
 						break;
 					}
 					case SDLK_l:
 					{
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::LUT);
-						_rootItem->recursivelyCalculateSize();
-						_rootItem->sort();
-						_redrawRequired = true;
+						_unusedItem->recursivelyCalculateSize();
+						_unusedItem->sort();
+						_treeMapRedrawRequired = true;
 						break;
 					}
 					case SDLK_s:
 					{
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::SLICE);
-						_rootItem->recursivelyCalculateSize();
-						_rootItem->sort();
-						_redrawRequired = true;
+						_unusedItem->recursivelyCalculateSize();
+						_unusedItem->sort();
+						_treeMapRedrawRequired = true;
 						break;
 					}
 					case SDLK_f:
 					{
 						CFpgaItem::SetUtilisationMetric(EUtilisationMetric::REG);
-						_rootItem->recursivelyCalculateSize();
-						_rootItem->sort();
-						_redrawRequired = true;
+						_unusedItem->recursivelyCalculateSize();
+						_unusedItem->sort();
+						_treeMapRedrawRequired = true;
+						break;
+					}
+					case SDLK_u:
+					{
+						if(_itemToDraw == _unusedItem)
+						{
+							_itemToDraw = _unusedItem->getChild(0);
+						}
+						else
+						{
+							_itemToDraw = _unusedItem;
+						}
+						_treeMapRedrawRequired = true;
 						break;
 					}
 					case SDLK_LEFT:
@@ -256,34 +288,59 @@ void CSdlDisplay::handleEvents()
 						// select parent
 						if (_selectedItem && _selectedItem->getParent())
 						{
-							_selectedItem = _selectedItem->getParent();
-							_selectedItem->printHeirachy();
-							_redrawRequired = true;
+							CFpgaItem* item = _selectedItem->getParent();
+							if (item)
+							{
+								_selectedItem = item;
+								_selectedItem->printHeirachy();
+							}
+							_selectedRedrawRequired = true;
 						}
+						break;
 					}
 					case SDLK_DOWN:
 					{
 						// select next sibling, or parent's next child
 						if (_selectedItem)
 						{
-							// not implemented
+							CFpgaItem* item = _selectedItem->getNextSibling();
+							if (item)
+							{
+								_selectedItem = item;
+								_selectedItem->printHeirachy();
+							}
+							_selectedRedrawRequired = true;
 						}
+						break;
 					}
 					case SDLK_UP:
 					{
 						// select previous sibling, of parent when first sibling
 						if (_selectedItem)
 						{
-							// not implemented
+							CFpgaItem* item = _selectedItem->getPreviousSibling();
+							if (item)
+							{
+								_selectedItem = item;
+								_selectedItem->printHeirachy();
+							}
+							_selectedRedrawRequired = true;
 						}
+						break;
 					}
 					case SDLK_RIGHT:
 					{
 						// select first child
 						if (_selectedItem)
 						{
-							// not implemented
+							if (_selectedItem->TmiGetChildrenCount() > 0)
+							{
+								_selectedItem = _selectedItem->getChild(0);
+								_selectedItem->printHeirachy();
+								_selectedRedrawRequired = true;
+							}
 						}
+						break;
 					}
 				}
 				break;

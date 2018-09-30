@@ -29,15 +29,18 @@ public:
 	void        swapBuffers          ();
 
 	uint32_t*   getScreen            () const;
-	void        run                  (CTreeMap* treemap, CFpgaItem* rootItem);
+	void        run                  (CTreeMap* treemap, CFpgaItem* unusedItem);
 
 private:
 
+	uint8_t* _treeMapImage;
 	SDL_Surface* _screen;
 	CTreeMap* _treeMap;
-	CFpgaItem* _rootItem;
+	CFpgaItem* _unusedItem;
 	CFpgaItem* _selectedItem;
-	bool _redrawRequired;
+	CFpgaItem* _itemToDraw;
+	bool _treeMapRedrawRequired;
+	bool _selectedRedrawRequired;
 
 	SDL_Event _event;
 	uint32_t _windowWidth;
